@@ -1,0 +1,22 @@
+# The configuration of communication to the OpsMgr server
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-turbo-config-pdn
+data:
+  turbo.config: |-
+    {
+           "communicationConfig": {
+                 "serverMeta": {
+                    "version" : "6.3.0-SNAPSHOT",
+                    "turboServer": "<TURBO_SERVER>"
+                },
+                "restAPIConfig": {
+                    "opsManagerUserName": "<TURBO USER>",
+                    "opsManagerPassword": "<TURBO PASSWORD>"
+                }
+           },
+           "kongturboTargetConfig": {
+                "kongAdmin" : "<KONG ADMIN HOST>"
+           }
+     }

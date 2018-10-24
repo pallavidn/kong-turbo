@@ -1,0 +1,30 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: kongturbo-pdn
+  labels:
+    app: kongturbo-pdn
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: kongturbo-pdn
+    spec:
+      containers:
+        - name: kongturbo-pdn
+          # Replace the image with desired version
+          image: pallavidebnath/kongturbo:v1
+          imagePullPolicy: Always
+          args:
+            - --turboconfig=/etc/kongturbo/turbo.config
+            - --v=3
+          volumeMounts:
+          - name: kong-turbo-config
+            mountPath: /etc/kongturbo
+            readOnly: true
+      volumes:
+      - name: kong-turbo-config
+        configMap:
+          name: kong-turbo-config-pdn
+      restartPolicy: Always
