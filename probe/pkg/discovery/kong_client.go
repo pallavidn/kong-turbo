@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 const (
-	DEFAULT_HTTP_PROTOCOL = "http"
+	DEFAULT_HTTP_PROTOCOL   = "http"
 	DEFAULT_KONG_ADMIN_PORT = 8001
 )
 
@@ -26,7 +26,7 @@ func NewKongHttpClient(hostname string) (*KongHttpClient, error) {
 		return nil, err
 	}
 	return &KongHttpClient{
-		hostname: hostname,
+		hostname:   hostname,
 		httpClient: httpClient,
 	}, nil
 }
@@ -82,6 +82,7 @@ func (kongClient *KongHttpClient) GetServices() ([]*APIService, error) {
 	return kongServiceList, nil
 }
 
+// Parse service plugin for Function data
 func (kongClient *KongHttpClient) getServicePlugins(kongSvc *APIService) error {
 	hclient := kongClient.httpClient
 
@@ -121,6 +122,16 @@ func (kongClient *KongHttpClient) getServicePlugins(kongSvc *APIService) error {
 				configMap, isConfigMap := pluginInstance["config"].(map[string]interface{})
 				if isConfigMap {
 					functionName, _ = configMap["function_name"].(string)
+					if strings.HasPrefix(functionName, "arn:aws") {
+						if strings.HasSuffix(functionName, ":$LATEST") {
+							idx := strings.LastIndex(functionName, ":")
+							if idx > -1 {
+								temp := functionName[0:idx]
+								functionName = temp
+								fmt.Printf("### Changed function : %s\n", functionName)
+							}
+						}
+					}
 					break
 				}
 			}
@@ -130,7 +141,10 @@ func (kongClient *KongHttpClient) getServicePlugins(kongSvc *APIService) error {
 	if functionName == "" {
 		return fmt.Errorf("Function name not found for service %s", kongSvc.ServiceName)
 	}
-	kongSvc.FunctionName = functionName
+	function := &Function{
+		FunctionName: functionName,
+	}
+	kongSvc.Functions = append(kongSvc.Functions, function)
 	return nil
 }
 
@@ -173,7 +187,7 @@ func (kongClient *KongHttpClient) GetRoutes() ([]*FunctionRoute, error) {
 				kongRoute := &FunctionRoute{
 					RouteId:   id,
 					ServiceId: serviceId,
-					Path:      path,
+					Path:      path[1:],
 				}
 
 				//for _, path := range paths {
@@ -190,6 +204,7 @@ func (kongClient *KongHttpClient) GetRoutes() ([]*FunctionRoute, error) {
 	return kongRouteList, nil
 }
 
+// Parse route plugin for Function data
 func (kongClient *KongHttpClient) getRoutePlugins(kongRoute *FunctionRoute) error {
 	hclient := kongClient.httpClient
 
@@ -247,6 +262,7 @@ func (kongClient *KongHttpClient) getRoutePlugins(kongRoute *FunctionRoute) erro
 			}
 		}
 	}
+
 	if functionRoute == "" {
 		return fmt.Errorf("Function name not found for route %s:%s",
 			kongRoute.ServiceId, kongRoute.RouteId)

@@ -15,24 +15,24 @@ type APIService struct {
 	ServiceName  string
 	ServiceId    string
 	HostName     string
-	FunctionName string
+	//FunctionName string
+	Functions []*Function
+	//FunctionRoutes []*FunctionRoute
 }
 
 type FunctionRoute struct {
-	Path         string
-	ServiceId    string
-	FunctionHost string
 	RouteId      string
+	ServiceId    string
+	Path         string	//function uri
+	FunctionHost string
+	Method   string
+	Resource string
+	FunctionName string
 }
 
 type Function struct {
-	Method   string
 	Resource string
-}
-
-type Service struct {
-	Name      string
-	Functions []*Function
+	FunctionName string
 }
 
 func DiscoverAPIGateway(gatewayAddr string) ([]*proto.EntityDTO, error) {

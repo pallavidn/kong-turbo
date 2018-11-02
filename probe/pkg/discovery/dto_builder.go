@@ -4,12 +4,17 @@ import "github.com/turbonomic/turbo-go-sdk/pkg/proto"
 import (
 	"fmt"
 	"github.com/turbonomic/turbo-go-sdk/pkg/builder"
-	"strings"
 )
 
 const (
 	StitchingAttr            string = "GatewayVappId"	//"VappIds"	//"vAppUuid"
-	GatewayStitchingAttr            string = "GatewayVappId"
+	FunctionIdAttr            string = "GatewayVappId"
+	FunctionEndpointAttr            string = "FunctionEndpoint"
+
+	LocalNameAttr    string = "LocalName"
+	AltNameAttr      string = "altName"
+	ExternalNameAttr string = "externalnames"
+
 	DefaultPropertyNamespace string = "DEFAULT"
 	PropertyUsed        = "used"
 	PropertyCapacity    = "capacity"
@@ -28,50 +33,37 @@ func (dtoBuilder *APIServiceDTOyBuilder) buildDto(apiSvc *APIService, route *Fun
 	}
 
 	// id.
-	var vappId string
-	if apiSvc.FunctionName != "" {
-		vappId = apiSvc.FunctionName
-		idx := strings.LastIndex(vappId, ":")
-		if idx > -1 {
-			vappId_new := vappId[0:idx]
-			vappId = vappId_new
-			fmt.Printf("### Changed vapp id : %s\n", vappId)
-		}
+	var vappId, localId, altId string
+	if len(apiSvc.Functions) > 0 {
+		function := apiSvc.Functions[0]
+		localId = function.FunctionName
 	} else {
-		vappId = route.FunctionHost
-		//// function name and namespace
-		//substr := strings.Split(vappId, ".")
-		//if len(substr) > 2 {
-		//	funcName := substr[0]
-		//	namespace := substr[1]
-		//	vappId = fmt.Sprintf("%s/%s-%s", namespace, funcName, "00001-service")
-		//}
+		localId = route.FunctionHost
 	}
 
-	if vappId == "" {
+	if localId == "" {
 		return nil, fmt.Errorf("Cannot create function vapp without ID %++v", route)
 	}
 
-	fmt.Printf("**** vapp id : %s\n", vappId)
+	altId = route.Path	//functionEndpoint
+	fmt.Printf("**** local name: %s\n", localId)
+	fmt.Printf("**** alt name: %s\n", altId)
 
-	// uuis
-	vappUuid := strings.Join( []string{"kong-vapp",vappId}, "-")
-
-	// display name.
-	displayName := strings.Join( []string{"kong-vapp",vappId}, "-")
-
-	fmt.Printf("**** vapp vappUuid : %s\n", vappUuid)
-	fmt.Printf("**** vapp displayName : %s\n", displayName)
-
+	// uuid and display name
+	vappId = fmt.Sprintf("%s/%s/%s", "kong", route.Path, localId)
+	fmt.Printf("**** vappUuid : %s\n", vappId)
 
 	commodities := []*proto.CommodityDTO{}
 	commodity, _ := builder.NewCommodityDTOBuilder(proto.CommodityDTO_TRANSACTION).Create()
 	commodities = append(commodities, commodity)
 
 	vAppType := proto.EntityDTO_VIRTUAL_APPLICATION
-	entityDTOBuilder := builder.NewEntityDTOBuilder(proto.EntityDTO_VIRTUAL_APPLICATION, vappUuid).
-		DisplayName(displayName).
-		WithProperty(getEntityProperty(vappId)).
+	entityDTOBuilder := builder.NewEntityDTOBuilder(proto.EntityDTO_VIRTUAL_APPLICATION, vappId).
+		DisplayName(vappId).
+		//WithProperty(getEntityProperty(FunctionIdAttr, vappId)).
+		//WithProperty(getEntityProperty(FunctionEndpointAttr, functionEndpoint)).
+		WithProperty(getEntityProperty(LocalNameAttr, localId)).
+		WithProperty(getEntityProperty(AltNameAttr, altId)).
 		ReplacedBy(getReplacementMetaData(vAppType)).
 		SellsCommodities(commodities)
 
@@ -80,8 +72,8 @@ func (dtoBuilder *APIServiceDTOyBuilder) buildDto(apiSvc *APIService, route *Fun
 
 func getReplacementMetaData(entityType proto.EntityDTO_EntityType,
 ) *proto.EntityDTO_ReplacementEntityMetaData {
-	extAttr := StitchingAttr
-	intAttr := GatewayStitchingAttr
+	extAttr := ExternalNameAttr	//StitchingAttr
+	intAttr := LocalNameAttr
 	useTopoExt := true
 
 	b := builder.NewReplacementEntityMetaDataBuilder().
@@ -90,17 +82,16 @@ func getReplacementMetaData(entityType proto.EntityDTO_EntityType,
 			Entity:    &entityType,
 			Attribute: &extAttr,
 			UseTopoExt: &useTopoExt,
-		}).
-		PatchBuyingWithProperty(proto.CommodityDTO_TRANSACTION, []string{PropertyUsed}).
-		PatchBuyingWithProperty(proto.CommodityDTO_RESPONSE_TIME, []string{PropertyUsed}).
-		PatchSellingWithProperty(proto.CommodityDTO_TRANSACTION, []string{PropertyUsed, PropertyCapacity}).
-		PatchSellingWithProperty(proto.CommodityDTO_RESPONSE_TIME, []string{PropertyUsed, PropertyCapacity})
+		})
+		//PatchBuyingWithProperty(proto.CommodityDTO_TRANSACTION, []string{PropertyUsed}).
+		//PatchBuyingWithProperty(proto.CommodityDTO_RESPONSE_TIME, []string{PropertyUsed}).
+		//PatchSellingWithProperty(proto.CommodityDTO_TRANSACTION, []string{PropertyUsed, PropertyCapacity}).
+		//PatchSellingWithProperty(proto.CommodityDTO_RESPONSE_TIME, []string{PropertyUsed, PropertyCapacity})
 
 	return b.Build()
 }
 
-func getEntityProperty(value string) *proto.EntityDTO_EntityProperty {
-	attr := GatewayStitchingAttr	//StitchingAttr
+func getEntityProperty(attr, value string) *proto.EntityDTO_EntityProperty {
 	ns := DefaultPropertyNamespace
 
 	return &proto.EntityDTO_EntityProperty{
